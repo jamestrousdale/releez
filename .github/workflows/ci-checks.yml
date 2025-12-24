@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install mise tools
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@v3
 
       - name: Run dprint check
         run: mise exec -- poe check-dprint
