@@ -12,8 +12,8 @@ dprint = "0.50.1"
 
 [hooks]
 postinstall = [
-  "pkglink sync",
-  # "mise exec -- poe setup-hook",
+  # "mise exec -- pkglink sync",
+  "mise exec -- poe setup-hook",
   # "mise exec -- lefthook install",
 ]
 
