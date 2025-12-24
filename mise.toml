@@ -11,11 +11,11 @@ dprint = "0.50.1"
 "pipx:ty" = { version = "0.0.5" }
 
 [hooks]
-# Note: Postinstall hooks do not run in CI, this is intentional
+# Note: Postinstall hooks do not run in CI, this is intentional.
 postinstall = [
-  "[ \"$IS_CI\" -eq '1' ] && pkglink sync",
-  "[ \"$IS_CI\" -eq '1' ] && poe setup-hook",
-  "[ \"$IS_CI\" -eq '1' ] && mise exec -- lefthook install",
+  "if [ \"${CI:-}\" = \"true\" ]; then exit 0; fi; pkglink sync",
+  "if [ \"${CI:-}\" = \"true\" ]; then exit 0; fi; poe setup-hook",
+  "if [ \"${CI:-}\" = \"true\" ]; then exit 0; fi; lefthook install",
 ]
 
 [settings]
