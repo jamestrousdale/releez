@@ -139,7 +139,8 @@ class InvalidGitHubRemoteError(ReleezError):
         self.remote_url = remote_url
         super().__init__(
             f'Could not infer GitHub repo from remote URL: {remote_url}\n'
-            'Use an origin remote pointing at github.com (SSH or HTTPS).',
+            'Use an origin remote pointing at GitHub (SSH or HTTPS).\n'
+            'If using GitHub Enterprise Server, set GITHUB_SERVER_URL (and optionally GITHUB_API_URL).',
         )
 
 
