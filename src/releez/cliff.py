@@ -1,4 +1,6 @@
+import os
 import shutil
+import sysconfig
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +23,22 @@ class ReleaseNotes:
 
 
 def _git_cliff_base_cmd() -> list[str]:
+    scripts_dir = sysconfig.get_path('scripts')
+    if scripts_dir:
+        scripts_path = Path(scripts_dir)
+        candidates = [GIT_CLIFF_BIN]
+        if os.name == 'nt':  # pragma: no cover
+            candidates = [
+                f'{GIT_CLIFF_BIN}.exe',
+                f'{GIT_CLIFF_BIN}.cmd',
+                f'{GIT_CLIFF_BIN}.bat',
+                GIT_CLIFF_BIN,
+            ]
+        for name in candidates:
+            exe = scripts_path / name
+            if exe.is_file():
+                return [str(exe)]
+
     if shutil.which(GIT_CLIFF_BIN):
         return [GIT_CLIFF_BIN]
     raise MissingCliError(GIT_CLIFF_BIN)
