@@ -369,10 +369,10 @@ def release_tag(
         typer.echo(tag)
 
 
+app.add_typer(release_app, name='release')
+app.add_typer(version_app, name='version')
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     app()
-
-
-app.add_typer(release_app, name='release')
-app.add_typer(version_app, name='version')
