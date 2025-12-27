@@ -12,7 +12,7 @@ from releez.errors import GitCliffVersionComputeError, MissingCliError
 from releez.process import run_checked
 
 GIT_CLIFF_BIN = 'git-cliff'
-GIT_CLIFF_IGNORE_TAGS = 'v'
+GIT_CLIFF_TAG_PATTERN = '^[0-9]+\\.[0-9]+\\.[0-9]+$'
 
 GitCliffBump = Literal['major', 'minor', 'patch', 'auto']
 
@@ -79,8 +79,8 @@ class GitCliff:
                 *self._cmd,
                 '--unreleased',
                 '--bumped-version',
-                '--ignore-tags',
-                GIT_CLIFF_IGNORE_TAGS,
+                '--tag-pattern',
+                GIT_CLIFF_TAG_PATTERN,
                 *_bump_args(bump),
             ],
             cwd=self._repo_root,
@@ -116,8 +116,8 @@ class GitCliff:
                     'all',
                     '--tag',
                     version,
-                    '--ignore-tags',
-                    GIT_CLIFF_IGNORE_TAGS,
+                    '--tag-pattern',
+                    GIT_CLIFF_TAG_PATTERN,
                     '--output',
                     str(out_path),
                 ],
@@ -149,8 +149,8 @@ class GitCliff:
                 '--unreleased',
                 '--tag',
                 version,
-                '--ignore-tags',
-                GIT_CLIFF_IGNORE_TAGS,
+                '--tag-pattern',
+                GIT_CLIFF_TAG_PATTERN,
                 '--prepend',
                 str(changelog_path),
             ],
