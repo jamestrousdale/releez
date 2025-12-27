@@ -4,7 +4,7 @@ releez is a CLI tool for managing semantic versioned releases.
 
 ## Usage
 
-Start a release from your repo (requires `git` and `git-cliff` on `PATH`):
+Start a release from your repo (requires `git` on `PATH`):
 
 `releez release start`
 
@@ -31,8 +31,6 @@ Common options / env vars:
 - `--prerelease-number ...` (or set `RELEEZ_PRERELEASE_NUMBER`)
 - `--build-number ...` (or set `RELEEZ_BUILD_NUMBER`)
 - `--alias-tags none|major|minor` (full releases only)
-- `--v-prefix/--no-v-prefix` (when using `--alias-tags`, whether tags are
-  `v`-prefixed; default: `--v-prefix`)
 
 Examples:
 
@@ -67,6 +65,12 @@ Preview what will be published (version and tags):
 `releez release preview` (prints markdown to stdout)
 
 `releez release preview --output release-preview.md` (write markdown to a file)
+
+Generate the unreleased changelog section for the release:
+
+`releez release notes` (prints markdown to stdout)
+
+`releez release notes --output release-notes.md` (write markdown to a file)
 
 ## GitHub recommendations
 

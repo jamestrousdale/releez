@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import re
 from dataclasses import dataclass
@@ -42,9 +44,15 @@ class PullRequestCreateRequest:
     labels: list[str]
 
 
-_SCP_SSH_RE = re.compile(r'^git@(?P<host>[^:]+):(?P<full>[^/]+/[^/]+?)(?:\\.git)?$')
-_SSH_URL_RE = re.compile(r'^ssh://git@(?P<host>[^/]+)/(?P<full>[^/]+/[^/]+?)(?:\\.git)?$')
-_HTTPS_RE = re.compile(r'^https?://(?P<host>[^/]+)/(?P<full>[^/]+/[^/]+?)(?:\\.git)?$')
+_SCP_SSH_RE = re.compile(
+    r'^git@(?P<host>[^:]+):(?P<full>[^/]+/[^/]+?)(?:\\.git)?$',
+)
+_SSH_URL_RE = re.compile(
+    r'^ssh://git@(?P<host>[^/]+)/(?P<full>[^/]+/[^/]+?)(?:\\.git)?$',
+)
+_HTTPS_RE = re.compile(
+    r'^https?://(?P<host>[^/]+)/(?P<full>[^/]+/[^/]+?)(?:\\.git)?$',
+)
 
 
 def _github_api_base_url_from_env() -> str | None:
@@ -52,10 +60,12 @@ def _github_api_base_url_from_env() -> str | None:
     if api_url:
         return api_url.rstrip('/')
 
-    server_url = os.getenv('RELEEZ_GITHUB_SERVER_URL') or os.getenv('GITHUB_SERVER_URL')
+    server_url = os.getenv('RELEEZ_GITHUB_SERVER_URL') or os.getenv(
+        'GITHUB_SERVER_URL',
+    )
     if not server_url:
         return None
-    return f'{server_url.rstrip('/')}/api/v3'
+    return f'{server_url.rstrip("/")}/api/v3'
 
 
 def _allowed_github_hosts_from_env() -> set[str]:
@@ -115,10 +125,14 @@ def create_pull_request(request: PullRequestCreateRequest) -> PullRequest:
 
     full_name = _parse_github_full_name(request.remote_url)
     base_url = _github_api_base_url_from_env()
-    if base_url:
-        gh = Github(login_or_token=request.token, base_url=base_url)
-    else:
-        gh = Github(request.token)
+    gh = (
+        Github(
+            login_or_token=request.token,
+            base_url=base_url,
+        )
+        if base_url
+        else Github(request.token)
+    )
     repo = gh.get_repo(full_name)
     pr = repo.create_pull(
         title=request.title,

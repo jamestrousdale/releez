@@ -1,6 +1,9 @@
-import re
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import StrEnum
+
+from semver import VersionInfo
 
 from releez.errors import InvalidReleaseVersionError
 
@@ -28,17 +31,11 @@ class VersionTags:
     minor: str
 
 
-_RELEASE_VERSION_RE = re.compile(
-    r'^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)$',
-)
-
-
-def compute_version_tags(*, version: str, prefix: str = '') -> VersionTags:
+def compute_version_tags(*, version: str) -> VersionTags:
     """Compute exact/major/minor tags for a full release version.
 
     Args:
-        version: The full release version (`x.y.z`), optionally prefixed with `v`.
-        prefix: Prefix to apply to alias tags (major/minor), e.g. `v`.
+        version: The full release version (`x.y.z`).
 
     Returns:
         The computed tag strings.
@@ -48,17 +45,18 @@ def compute_version_tags(*, version: str, prefix: str = '') -> VersionTags:
     """
     normalized = version.strip().removeprefix('v')
 
-    match = _RELEASE_VERSION_RE.match(normalized)
-    if not match:
-        raise InvalidReleaseVersionError(version)
+    try:
+        parsed = VersionInfo.parse(normalized)
+    except ValueError as exc:
+        raise InvalidReleaseVersionError(version) from exc
 
-    major = int(match.group('major'))
-    minor = int(match.group('minor'))
+    if parsed.prerelease is not None or parsed.build is not None:
+        raise InvalidReleaseVersionError(version)
 
     return VersionTags(
         exact=normalized,
-        major=f'{prefix}{major}',
-        minor=f'{prefix}{major}.{minor}',
+        major=f'v{parsed.major}',
+        minor=f'v{parsed.major}.{parsed.minor}',
     )
 
 

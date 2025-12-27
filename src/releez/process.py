@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 import subprocess
-from collections.abc import Sequence
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from releez.errors import ExternalCommandError, MissingCliError
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from pathlib import Path
 
 
 def run_checked(

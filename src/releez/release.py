@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from git import Repo
+if TYPE_CHECKING:
+    from git import Repo
 
 from releez.cliff import GitCliff, GitCliffBump
 from releez.errors import (
@@ -144,10 +148,7 @@ def start_release(
         )
 
     version = cliff.compute_next_version(bump=release_input.bump)
-    notes = cliff.generate_unreleased_notes(
-        version=version,
-        bump=release_input.bump,
-    )
+    notes = cliff.generate_unreleased_notes(version=version)
 
     if release_input.dry_run:
         return StartReleaseResult(

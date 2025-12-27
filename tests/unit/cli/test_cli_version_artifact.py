@@ -1,4 +1,7 @@
-from pytest_mock import MockerFixture
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from typer.testing import CliRunner
 
 from releez import cli
@@ -8,6 +11,9 @@ from releez.artifact_version import (
     PrereleaseType,
 )
 from releez.version_tags import VersionTags
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 def test_cli_version_artifact_builds_input_and_prints_result(
@@ -69,7 +75,7 @@ def test_cli_version_artifact_alias_tags_use_v_prefix_only_for_aliases(
     )
 
     assert result.exit_code == 0
-    compute_tags.assert_called_once_with(version='1.2.3', prefix='v')
+    compute_tags.assert_called_once_with(version='1.2.3')
     assert result.stdout == '1.2.3\nv1\n'
 
 

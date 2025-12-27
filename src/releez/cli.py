@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
@@ -57,7 +59,6 @@ def _emit_artifact_version_output(
     artifact_version: str,
     is_full_release: bool,
     alias_tags: AliasTags,
-    v_prefix: bool,
 ) -> None:
     if alias_tags == AliasTags.none:
         typer.echo(artifact_version)
@@ -66,8 +67,7 @@ def _emit_artifact_version_output(
     if not is_full_release:
         raise AliasTagsRequireFullReleaseError
 
-    prefix = 'v' if v_prefix else ''
-    tags = compute_version_tags(version=artifact_version, prefix=prefix)
+    tags = compute_version_tags(version=artifact_version)
     for tag in select_tags(tags=tags, aliases=alias_tags):
         typer.echo(tag)
 
@@ -284,14 +284,6 @@ def version_artifact(  # noqa: PLR0913
             case_sensitive=False,
         ),
     ] = AliasTags.none,
-    v_prefix: Annotated[
-        bool,
-        typer.Option(
-            '--v-prefix/--no-v-prefix',
-            help='Prefix alias tags with `v` (v2, v2.3).',
-            show_default=True,
-        ),
-    ] = True,
 ) -> None:
     """Compute an artifact version string."""
     try:
@@ -309,7 +301,6 @@ def version_artifact(  # noqa: PLR0913
             artifact_version=artifact_version,
             is_full_release=is_full_release,
             alias_tags=alias_tags,
-            v_prefix=v_prefix,
         )
     except ReleezError as exc:
         typer.secho(str(exc), err=True, fg=typer.colors.RED)
@@ -336,14 +327,6 @@ def release_tag(
             case_sensitive=False,
         ),
     ] = AliasTags.none,
-    v_prefix: Annotated[
-        bool,
-        typer.Option(
-            '--v-prefix/--no-v-prefix',
-            help='Prefix alias tags with `v` (v2, v2.3).',
-            show_default=True,
-        ),
-    ] = True,
     remote: Annotated[
         str,
         typer.Option(
@@ -369,8 +352,7 @@ def release_tag(
             repo_root=_info.root,
             version_override=version_override,
         )
-        prefix = 'v' if v_prefix else ''
-        tags = compute_version_tags(version=version, prefix=prefix)
+        tags = compute_version_tags(version=version)
         selected = select_tags(tags=tags, aliases=alias_tags)
         create_tags(repo, tags=selected, force=force)
         push_tags(
@@ -407,14 +389,6 @@ def release_preview(
             case_sensitive=False,
         ),
     ] = AliasTags.none,
-    v_prefix: Annotated[
-        bool,
-        typer.Option(
-            '--v-prefix/--no-v-prefix',
-            help='Prefix alias tags with `v` (v2, v2.3).',
-            show_default=True,
-        ),
-    ] = True,
     output: Annotated[
         Path | None,
         typer.Option(
@@ -432,8 +406,7 @@ def release_preview(
             version_override=version_override,
         )
 
-        prefix = 'v' if v_prefix else ''
-        computed = compute_version_tags(version=version, prefix=prefix)
+        computed = compute_version_tags(version=version)
         tags = select_tags(tags=computed, aliases=alias_tags)
 
         markdown = '\n'.join(
@@ -448,9 +421,50 @@ def release_preview(
         )
 
         if output is not None:
-            output.write_text(markdown, encoding='utf-8')
+            output_path = Path(output)
+            output_path.write_text(markdown, encoding='utf-8')
         else:
             typer.echo(markdown)
+    except ReleezError as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=1) from exc
+
+
+@release_app.command('notes')
+def release_notes(
+    *,
+    version_override: Annotated[
+        str | None,
+        typer.Option(
+            '--version-override',
+            help='Override release version for the notes section (x.y.z).',
+            show_default=False,
+        ),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            '--output',
+            help='Write release notes to a file instead of stdout.',
+            show_default=False,
+        ),
+    ] = None,
+) -> None:
+    """Generate the new changelog section for the release."""
+    try:
+        _repo, info = open_repo()
+        version = _resolve_release_version(
+            repo_root=info.root,
+            version_override=version_override,
+        )
+        cliff = GitCliff(repo_root=info.root)
+        notes = cliff.generate_unreleased_notes(version=version)
+
+        if output is not None:
+            output_path = Path(output)
+            output_path.write_text(notes, encoding='utf-8')
+        else:
+            typer.echo(notes)
     except ReleezError as exc:
         typer.secho(str(exc), err=True, fg=typer.colors.RED)
         raise typer.Exit(code=1) from exc

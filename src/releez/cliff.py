@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import shutil
 import sysconfig
@@ -10,6 +12,7 @@ from releez.errors import GitCliffVersionComputeError, MissingCliError
 from releez.process import run_checked
 
 GIT_CLIFF_BIN = 'git-cliff'
+GIT_CLIFF_IGNORE_TAGS = 'v*'
 
 GitCliffBump = Literal['major', 'minor', 'patch', 'auto']
 
@@ -76,6 +79,8 @@ class GitCliff:
                 *self._cmd,
                 '--unreleased',
                 '--bumped-version',
+                '--ignore-tags',
+                GIT_CLIFF_IGNORE_TAGS,
                 *_bump_args(bump),
             ],
             cwd=self._repo_root,
@@ -88,13 +93,11 @@ class GitCliff:
         self,
         *,
         version: str,
-        bump: GitCliffBump,
     ) -> str:
         """Generate the unreleased section as markdown.
 
         Args:
             version: The version to tag the release notes.
-            bump: The bump mode for git-cliff.
 
         Returns:
             The generated markdown content.
@@ -113,9 +116,10 @@ class GitCliff:
                     'all',
                     '--tag',
                     version,
+                    '--ignore-tags',
+                    GIT_CLIFF_IGNORE_TAGS,
                     '--output',
                     str(out_path),
-                    *_bump_args(bump),
                 ],
                 cwd=self._repo_root,
                 capture_stdout=False,
@@ -145,6 +149,8 @@ class GitCliff:
                 '--unreleased',
                 '--tag',
                 version,
+                '--ignore-tags',
+                GIT_CLIFF_IGNORE_TAGS,
                 '--prepend',
                 str(changelog_path),
             ],

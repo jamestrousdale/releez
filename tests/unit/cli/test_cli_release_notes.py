@@ -12,12 +12,11 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def test_cli_release_preview_writes_markdown(
+def test_cli_release_notes_stdout(
     mocker: MockerFixture,
     tmp_path: Path,
 ) -> None:
     runner = CliRunner()
-
     repo_root = tmp_path / 'repo'
     repo_root.mkdir()
 
@@ -25,36 +24,23 @@ def test_cli_release_preview_writes_markdown(
         'releez.cli.open_repo',
         return_value=(object(), mocker.Mock(root=repo_root)),
     )
+    mocker.patch('releez.cli._resolve_release_version', return_value='2.3.4')
 
     cliff = mocker.Mock()
-    cliff.compute_next_version.return_value = '2.3.4'
+    cliff.generate_unreleased_notes.return_value = '## 2.3.4\n\n- Change\n'
     mocker.patch('releez.cli.GitCliff', return_value=cliff)
 
-    output = tmp_path / 'preview.md'
-    result = runner.invoke(
-        cli.app,
-        [
-            'release',
-            'preview',
-            '--alias-tags',
-            'major',
-            '--output',
-            str(output),
-        ],
-    )
+    result = runner.invoke(cli.app, ['release', 'notes'])
 
     assert result.exit_code == 0
-    content = output.read_text(encoding='utf-8')
-    assert '## `releez` release preview' in content
-    assert '`2.3.4`' in content
+    assert result.stdout == '## 2.3.4\n\n- Change\n\n'
 
 
-def test_cli_release_preview_stdout(
+def test_cli_release_notes_writes_file(
     mocker: MockerFixture,
     tmp_path: Path,
 ) -> None:
     runner = CliRunner()
-
     repo_root = tmp_path / 'repo'
     repo_root.mkdir()
 
@@ -62,21 +48,17 @@ def test_cli_release_preview_stdout(
         'releez.cli.open_repo',
         return_value=(object(), mocker.Mock(root=repo_root)),
     )
+    mocker.patch('releez.cli._resolve_release_version', return_value='2.3.4')
 
     cliff = mocker.Mock()
-    cliff.compute_next_version.return_value = '1.2.3'
+    cliff.generate_unreleased_notes.return_value = '## 2.3.4\n'
     mocker.patch('releez.cli.GitCliff', return_value=cliff)
 
+    output = tmp_path / 'notes.md'
     result = runner.invoke(
         cli.app,
-        [
-            'release',
-            'preview',
-            '--alias-tags',
-            'none',
-        ],
+        ['release', 'notes', '--output', str(output)],
     )
 
     assert result.exit_code == 0
-    assert '## `releez` release preview' in result.stdout
-    assert '`1.2.3`' in result.stdout
+    assert output.read_text(encoding='utf-8') == '## 2.3.4\n'

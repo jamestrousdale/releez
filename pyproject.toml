@@ -2,7 +2,7 @@
 name = "releez"
 description = "CLI tool for helping to manage release processes."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 version = "0.0.0"
 
 dependencies = [
@@ -10,6 +10,7 @@ dependencies = [
   "GitPython >= 3.1.45, <4",
   "PyGithub >= 2.8.1, <3",
   "git-cliff >=2.11.0, <3",
+  "semver >=3.0.1, <4",
 ]
 
 [dependency-groups]

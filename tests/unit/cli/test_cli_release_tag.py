@@ -1,10 +1,15 @@
-from pathlib import Path
+from __future__ import annotations
 
-from pytest_mock import MockerFixture
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 from typer.testing import CliRunner
 
 from releez import cli
 from releez.version_tags import VersionTags
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 def test_cli_release_tag_calls_git_helpers(mocker: MockerFixture) -> None:
@@ -88,38 +93,3 @@ def test_cli_release_tag_defaults_to_git_cliff(
         force=False,
     )
     assert result.stdout == '2.3.4\n'
-
-
-def test_cli_release_tag_no_v_prefix(mocker: MockerFixture) -> None:
-    runner = CliRunner()
-    repo = object()
-
-    mocker.patch(
-        'releez.cli.open_repo',
-        return_value=(repo, mocker.Mock(root=Path.cwd())),
-    )
-    mocker.patch('releez.cli.fetch')
-    compute_version_tags = mocker.patch(
-        'releez.cli.compute_version_tags',
-        return_value=VersionTags(exact='2.3.4', major='2', minor='2.3'),
-    )
-    mocker.patch('releez.cli.select_tags', return_value=['2.3.4', '2'])
-    mocker.patch('releez.cli.create_tags')
-    mocker.patch('releez.cli.push_tags')
-
-    result = runner.invoke(
-        cli.app,
-        [
-            'release',
-            'tag',
-            '--version-override',
-            '2.3.4',
-            '--alias-tags',
-            'major',
-            '--no-v-prefix',
-        ],
-    )
-
-    assert result.exit_code == 0
-    compute_version_tags.assert_called_once_with(version='2.3.4', prefix='')
-    assert result.stdout == '2.3.4\n2\n'
