@@ -42,17 +42,19 @@ def test_cli_release_tag_calls_git_helpers(mocker: MockerFixture) -> None:
     )
 
     assert result.exit_code == 0
-    create_tags.assert_called_once_with(
-        repo,
-        tags=['2.3.4', 'v2', 'v2.3'],
-        force=False,
-    )
-    push_tags.assert_called_once_with(
-        repo,
-        remote_name='origin',
-        tags=['2.3.4', 'v2', 'v2.3'],
-        force=False,
-    )
+    assert create_tags.call_args_list == [
+        mocker.call(repo, tags=['2.3.4'], force=False),
+        mocker.call(repo, tags=['v2', 'v2.3'], force=True),
+    ]
+    assert push_tags.call_args_list == [
+        mocker.call(repo, remote_name='origin', tags=['2.3.4'], force=False),
+        mocker.call(
+            repo,
+            remote_name='origin',
+            tags=['v2', 'v2.3'],
+            force=True,
+        ),
+    ]
     assert result.stdout == '2.3.4\nv2\nv2.3\n'
 
 

@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 from releez import cli
 
 if TYPE_CHECKING:
+    import pytest
     from pytest_mock import MockerFixture
 
 
@@ -61,3 +62,63 @@ def test_cli_release_start_defaults_version_override_to_none(
     assert result.exit_code == 0
     release_input = start_release.call_args.args[0]
     assert release_input.version_override is None
+
+
+def test_cli_release_start_run_changelog_format_uses_configured_command(
+    mocker: MockerFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = CliRunner()
+
+    monkeypatch.setenv(
+        'RELEEZ_HOOKS__CHANGELOG_FORMAT',
+        '["dprint", "fmt", "{changelog}"]',
+    )
+
+    start_release = mocker.patch(
+        'releez.cli.start_release',
+        return_value=mocker.Mock(
+            version='1.2.3',
+            release_notes_markdown='notes',
+            release_branch=None,
+            pr_url=None,
+        ),
+    )
+
+    result = runner.invoke(
+        cli.app,
+        ['release', 'start', '--dry-run', '--run-changelog-format'],
+    )
+
+    assert result.exit_code == 0
+    release_input = start_release.call_args.args[0]
+    assert release_input.run_changelog_format is True
+    assert release_input.changelog_format_cmd == [
+        'dprint',
+        'fmt',
+        '{changelog}',
+    ]
+
+
+def test_cli_release_start_run_changelog_format_requires_command(
+    mocker: MockerFixture,
+) -> None:
+    runner = CliRunner()
+
+    mocker.patch(
+        'releez.cli.start_release',
+        return_value=mocker.Mock(
+            version='1.2.3',
+            release_notes_markdown='notes',
+            release_branch=None,
+            pr_url=None,
+        ),
+    )
+
+    result = runner.invoke(
+        cli.app,
+        ['release', 'start', '--dry-run', '--run-changelog-format'],
+    )
+
+    assert result.exit_code == 1
+    assert 'no format command is configured' in result.output.lower()

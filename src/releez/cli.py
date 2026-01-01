@@ -15,10 +15,12 @@ from releez.artifact_version import (
 from releez.cliff import GitCliff, GitCliffBump
 from releez.errors import (
     AliasTagsRequireFullReleaseError,
+    ChangelogFormatCommandRequiredError,
     ReleezError,
 )
 from releez.git_repo import create_tags, fetch, open_repo, push_tags
 from releez.release import StartReleaseInput, start_release
+from releez.settings import ReleezSettings
 from releez.version_tags import AliasTags, compute_version_tags, select_tags
 
 app = typer.Typer(help='CLI tool for helping to manage release processes.')
@@ -27,8 +29,43 @@ version_app = typer.Typer(help='Version utilities for CI/artifacts.')
 
 
 @app.callback()
-def _root() -> None:
-    return
+def _root(ctx: typer.Context) -> None:
+    settings = ReleezSettings()
+    ctx.obj = settings
+
+    default_map: dict[str, object] = {}
+    default_map['release'] = {
+        'start': {
+            'base': settings.base_branch,
+            'remote': settings.git_remote,
+            'labels': settings.pr_labels,
+            'title_prefix': settings.pr_title_prefix,
+            'changelog_path': settings.changelog_path,
+            'create_pr': settings.create_pr,
+            'run_changelog_format': settings.run_changelog_format,
+            'changelog_format_cmd': settings.hooks.changelog_format,
+        },
+        'tag': {
+            'remote': settings.git_remote,
+            'alias_tags': settings.alias_tags,
+        },
+        'preview': {
+            'alias_tags': settings.alias_tags,
+        },
+    }
+    default_map['version'] = {
+        'artifact': {
+            'alias_tags': settings.alias_tags,
+        },
+    }
+
+    if ctx.default_map is None:
+        ctx.default_map = default_map
+    else:
+        ctx.default_map = {
+            **ctx.default_map,
+            **default_map,
+        }
 
 
 @dataclass(frozen=True)
@@ -92,6 +129,10 @@ def _resolve_release_version(
     return cliff.compute_next_version(bump='auto')
 
 
+def _raise_changelog_format_command_required() -> None:
+    raise ChangelogFormatCommandRequiredError
+
+
 @release_app.command('start')
 def release_start(  # noqa: PLR0913
     *,
@@ -107,18 +148,30 @@ def release_start(  # noqa: PLR0913
         str | None,
         typer.Option(
             '--version-override',
-            envvar=[
-                'RELEEZ_VERSION_OVERRIDE',
-                'NEXT_VERSION',
-                '__GIT_CLIFF_NEXT_VERSION',
-            ],
             help='Override version instead of computing via git-cliff.',
+            show_default=False,
+        ),
+    ] = None,
+    run_changelog_format: Annotated[
+        bool,
+        typer.Option(
+            '--run-changelog-format',
+            help='Run the configured changelog formatter before committing.',
+            show_default=True,
+        ),
+    ] = False,
+    changelog_format_cmd: Annotated[
+        list[str] | None,
+        typer.Option(
+            '--changelog-format-cmd',
+            help='Override changelog format command argv (repeatable).',
             show_default=False,
         ),
     ] = None,
     create_pr: Annotated[
         bool,
         typer.Option(
+            '--create-pr/--no-create-pr',
             help='Create a GitHub PR (requires token).',
             show_default=True,
         ),
@@ -132,7 +185,6 @@ def release_start(  # noqa: PLR0913
     base: Annotated[
         str,
         typer.Option(
-            envvar='RELEEZ_BASE_BRANCH',
             help='Base branch for the release PR.',
             show_default=True,
         ),
@@ -140,7 +192,6 @@ def release_start(  # noqa: PLR0913
     remote: Annotated[
         str,
         typer.Option(
-            envvar='RELEEZ_GIT_REMOTE',
             help='Remote name to use.',
             show_default=True,
         ),
@@ -148,7 +199,6 @@ def release_start(  # noqa: PLR0913
     labels: Annotated[
         str,
         typer.Option(
-            envvar='RELEEZ_PR_LABELS',
             help='Comma-separated label(s) to add to the PR (repeatable).',
             show_default=True,
         ),
@@ -156,15 +206,15 @@ def release_start(  # noqa: PLR0913
     title_prefix: Annotated[
         str,
         typer.Option(
-            envvar='RELEEZ_PR_TITLE_PREFIX',
             help='Prefix for PR title.',
             show_default=True,
         ),
     ] = 'chore(release): ',
-    changelog: Annotated[
+    changelog_path: Annotated[
         str,
         typer.Option(
-            envvar='RELEEZ_CHANGELOG_PATH',
+            '--changelog-path',
+            '--changelog',
             help='Changelog file to prepend to.',
             show_default=True,
         ),
@@ -186,19 +236,24 @@ def release_start(  # noqa: PLR0913
     Args:
         bump: Bump mode for git-cliff.
         version_override: Override the computed next version.
+        run_changelog_format: If true, run the configured changelog formatter before commit.
+        changelog_format_cmd: Override the configured changelog formatter argv.
         create_pr: If true, create a GitHub pull request.
         dry_run: If true, do not modify the repo; just output version and notes.
         base: Base branch for the release PR.
         remote: Remote name to use.
         labels: Comma-separated labels to add to the PR.
         title_prefix: Prefix for PR title.
-        changelog: Changelog file to prepend to.
+        changelog_path: Changelog file to prepend to.
         github_token: GitHub token for PR creation.
 
     Raises:
         typer.Exit: If an error occurs during release processing.
     """
     try:
+        if run_changelog_format and not changelog_format_cmd:
+            _raise_changelog_format_command_required()
+
         release_input = StartReleaseInput(
             bump=bump,
             version_override=version_override,
@@ -206,7 +261,9 @@ def release_start(  # noqa: PLR0913
             remote_name=remote,
             labels=labels.split(',') if labels else [],
             title_prefix=title_prefix,
-            changelog_path=changelog,
+            changelog_path=changelog_path,
+            run_changelog_format=run_changelog_format,
+            changelog_format_cmd=changelog_format_cmd,
             create_pr=create_pr,
             github_token=github_token,
             dry_run=dry_run,
@@ -235,6 +292,7 @@ def version_artifact(  # noqa: PLR0913
     scheme: Annotated[
         ArtifactVersionScheme,
         typer.Option(
+            '--scheme',
             help='Output scheme for the artifact version.',
             show_default=True,
             case_sensitive=False,
@@ -243,11 +301,6 @@ def version_artifact(  # noqa: PLR0913
     is_full_release: Annotated[
         bool,
         typer.Option(
-            envvar=[
-                'RELEEZ_IS_FULL_RELEASE',
-                'RELEEZE_IS_FULL_RELEASE',
-                'IS_RELEASE_BUILD',
-            ],
             help='If true, output a full release version without prerelease markers.',
             show_default=True,
         ),
@@ -255,11 +308,6 @@ def version_artifact(  # noqa: PLR0913
     prerelease_type: Annotated[
         PrereleaseType,
         typer.Option(
-            envvar=[
-                'RELEEZ_PRERELEASE_TYPE',
-                'RELEEZE_PRERELEASE_TYPE',
-                'PRERELEASE_TYPE',
-            ],
             help='Prerelease label (alpha, beta, rc).',
             show_default=True,
             case_sensitive=False,
@@ -268,10 +316,6 @@ def version_artifact(  # noqa: PLR0913
     prerelease_number: Annotated[
         int | None,
         typer.Option(
-            envvar=[
-                'RELEEZ_PRERELEASE_NUMBER',
-                'RELEEZE_PRERELEASE_NUMBER',
-            ],
             help='Optional prerelease number (e.g. PR number for alpha123).',
             show_default=False,
         ),
@@ -279,7 +323,6 @@ def version_artifact(  # noqa: PLR0913
     build_number: Annotated[
         int | None,
         typer.Option(
-            envvar=['RELEEZ_BUILD_NUMBER', 'BUILD_NUMBER'],
             help='Build number for prerelease builds.',
             show_default=False,
         ),
@@ -288,11 +331,6 @@ def version_artifact(  # noqa: PLR0913
         str | None,
         typer.Option(
             '--version-override',
-            envvar=[
-                'RELEEZ_VERSION_OVERRIDE',
-                'NEXT_VERSION',
-                '__GIT_CLIFF_NEXT_VERSION',
-            ],
             help='Override version instead of computing via git-cliff.',
             show_default=False,
         ),
@@ -358,14 +396,6 @@ def release_tag(
             show_default=True,
         ),
     ] = 'origin',
-    force: Annotated[
-        bool,
-        typer.Option(
-            '--force',
-            help='Overwrite existing tags (required to move tags like v2).',
-            show_default=True,
-        ),
-    ] = False,
 ) -> None:
     """Create git tag(s) for a release and push them."""
     try:
@@ -377,13 +407,20 @@ def release_tag(
         )
         tags = compute_version_tags(version=version)
         selected = select_tags(tags=tags, aliases=alias_tags)
-        create_tags(repo, tags=selected, force=force)
-        push_tags(
-            repo,
-            remote_name=remote,
-            tags=selected,
-            force=force,
-        )
+        exact_tags = selected[:1]
+        alias_only_tags = selected[1:]
+
+        create_tags(repo, tags=exact_tags, force=False)
+        push_tags(repo, remote_name=remote, tags=exact_tags, force=False)
+
+        if alias_only_tags:
+            create_tags(repo, tags=alias_only_tags, force=True)
+            push_tags(
+                repo,
+                remote_name=remote,
+                tags=alias_only_tags,
+                force=True,
+            )
     except ReleezError as exc:
         typer.secho(str(exc), err=True, fg=typer.colors.RED)
         raise typer.Exit(code=1) from exc

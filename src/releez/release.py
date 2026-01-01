@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 from releez.cliff import GitCliff, GitCliffBump
 from releez.errors import (
+    ChangelogFormatCommandRequiredError,
     ChangelogNotFoundError,
     GitHubTokenRequiredError,
     GitRemoteUrlRequiredError,
@@ -23,6 +24,7 @@ from releez.git_repo import (
     push_set_upstream,
 )
 from releez.github import PullRequestCreateRequest, create_pull_request
+from releez.process import run_checked
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,8 @@ class StartReleaseInput:
         labels: Labels to add to the PR.
         title_prefix: Prefix for PR title / commit message.
         changelog_path: Changelog file to prepend to.
+        run_changelog_format: If true, run the configured changelog formatter before commit.
+        changelog_format_cmd: Optional argv list to run for formatting (overrides config).
         create_pr: If true, create a GitHub pull request.
         github_token: GitHub token for PR creation.
         dry_run: If true, do not modify the repo; just output version and notes.
@@ -66,6 +70,8 @@ class StartReleaseInput:
     labels: list[str]
     title_prefix: str
     changelog_path: str
+    run_changelog_format: bool
+    changelog_format_cmd: list[str] | None
     create_pr: bool
     github_token: str | None
     dry_run: bool
@@ -123,6 +129,43 @@ def _maybe_create_pull_request(
     return pr.url
 
 
+def _resolve_release_version(
+    *,
+    cliff: GitCliff,
+    release_input: StartReleaseInput,
+) -> str:
+    if release_input.version_override is not None:
+        return release_input.version_override
+    return cliff.compute_next_version(bump=release_input.bump)
+
+
+def _resolve_changelog_path(
+    *,
+    repo_root: Path,
+    changelog_path: str,
+) -> Path:
+    changelog = Path(changelog_path)
+    if not changelog.is_absolute():
+        changelog = repo_root / changelog
+    if not changelog.exists():
+        raise ChangelogNotFoundError(changelog)
+    return changelog
+
+
+def _format_changelog_if_requested(
+    *,
+    repo_root: Path,
+    changelog_path: Path,
+    release_input: StartReleaseInput,
+) -> None:
+    if not release_input.run_changelog_format:
+        return
+    if not release_input.changelog_format_cmd:
+        raise ChangelogFormatCommandRequiredError
+    cmd = [arg.replace('{changelog}', str(changelog_path)) for arg in release_input.changelog_format_cmd]
+    run_checked(cmd, cwd=repo_root, capture_stdout=False)
+
+
 def start_release(
     release_input: StartReleaseInput,
 ) -> StartReleaseResult:
@@ -149,10 +192,7 @@ def start_release(
             branch=release_input.base_branch,
         )
 
-    if release_input.version_override is not None:
-        version = release_input.version_override
-    else:
-        version = cliff.compute_next_version(bump=release_input.bump)
+    version = _resolve_release_version(cliff=cliff, release_input=release_input)
     notes = cliff.generate_unreleased_notes(version=version)
 
     if release_input.dry_run:
@@ -166,13 +206,17 @@ def start_release(
     release_branch = f'release/{version}'
     create_and_checkout_branch(repo, name=release_branch)
 
-    changelog = Path(release_input.changelog_path)
-    if not changelog.is_absolute():
-        changelog = info.root / changelog
-    if not changelog.exists():
-        raise ChangelogNotFoundError(changelog)
-
+    changelog = _resolve_changelog_path(
+        repo_root=info.root,
+        changelog_path=release_input.changelog_path,
+    )
     cliff.prepend_to_changelog(version=version, changelog_path=changelog)
+    _format_changelog_if_requested(
+        repo_root=info.root,
+        changelog_path=changelog,
+        release_input=release_input,
+    )
+
     commit_file(
         repo,
         path=changelog,

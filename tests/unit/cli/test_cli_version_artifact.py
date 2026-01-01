@@ -43,6 +43,8 @@ def test_cli_version_artifact_builds_input_and_prints_result(
             '--version-override',
             '1.2.3',
             '--is-full-release',
+            '--alias-tags',
+            'none',
         ],
     )
 
@@ -101,7 +103,9 @@ def test_cli_version_artifact_rejects_invalid_prerelease_type() -> None:
     assert result.exit_code != 0
 
 
-def test_cli_version_artifact_rejects_alias_tags_for_pep440(mocker: MockerFixture) -> None:
+def test_cli_version_artifact_rejects_alias_tags_for_pep440(
+    mocker: MockerFixture,
+) -> None:
     runner = CliRunner()
     mocker.patch('releez.cli.compute_artifact_version', return_value='1.2.3')
     compute_tags = mocker.patch('releez.cli.compute_version_tags')
