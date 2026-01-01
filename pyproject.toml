@@ -35,6 +35,10 @@ testpaths = ["tests"]
 module-name = "releez"
 module-root = "src"
 
+[tool.releez]
+create-pr = true
+hooks = { changelog-format = ["mise", "exec", "--", "poe", "format-dprint", "{changelog}"] }
+
 [build-system]
 requires = ["uv_build"]
 build-backend = "uv_build"
