@@ -222,7 +222,7 @@ def release_start(  # noqa: PLR0913
     github_token: Annotated[
         str | None,
         typer.Option(
-            envvar='GITHUB_TOKEN',
+            envvar=['RELEEZ_GITHUB_TOKEN', 'GITHUB_TOKEN'],
             help='GitHub token for PR creation (or set GITHUB_TOKEN).',
             show_default=False,
         ),
